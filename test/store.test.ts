@@ -61,6 +61,24 @@ describe("Store", () => {
     expect(store.listAssignments()).toEqual([{ shiftId: "s-0-9", employeeId: "a" }]);
   });
 
+  it("nests transactions as savepoints", () => {
+    store.upsertEmployee(emp({ id: "a" }));
+    store.upsertShift(shift(0, 9, 17));
+    expect(() =>
+      store.transaction(() => {
+        store.replaceAssignments([{ shiftId: "s-0-9", employeeId: "a" }]);
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    expect(store.listAssignments()).toEqual([]);
+
+    store.transaction(() => {
+      expect(() => store.transaction(() => store.moveAssignment("s-0-9", "a", "b"))).toThrow();
+      store.replaceAssignments([{ shiftId: "s-0-9", employeeId: "a" }]);
+    });
+    expect(store.listAssignments()).toEqual([{ shiftId: "s-0-9", employeeId: "a" }]);
+  });
+
   it("stores swaps and cancels the active ones", () => {
     store.upsertShift(shift(0, 9, 17));
     store.saveSwap(swap());

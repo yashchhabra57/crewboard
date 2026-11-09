@@ -78,15 +78,25 @@ export class Store {
     this.db.close();
   }
 
-  /** Runs `fn` atomically. */
+  private depth = 0;
+
+  /**
+   * Runs `fn` atomically. Re-entrant: nested calls become savepoints, so
+   * repository methods can be transactional on their own and still compose
+   * inside a larger service-level transaction.
+   */
   transaction<T>(fn: () => T): T {
-    this.db.exec("BEGIN");
+    const sp = `sp${this.depth}`;
+    this.db.exec(this.depth === 0 ? "BEGIN" : `SAVEPOINT ${sp}`);
+    this.depth++;
     try {
       const out = fn();
-      this.db.exec("COMMIT");
+      this.depth--;
+      this.db.exec(this.depth === 0 ? "COMMIT" : `RELEASE ${sp}`);
       return out;
     } catch (err) {
-      this.db.exec("ROLLBACK");
+      this.depth--;
+      this.db.exec(this.depth === 0 ? "ROLLBACK" : `ROLLBACK TO ${sp}; RELEASE ${sp}`);
       throw err;
     }
   }
