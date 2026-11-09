@@ -11,6 +11,11 @@ import { Store } from "../src/server/db/store.js";
 import type { LiveEvent } from "../src/server/live.js";
 import { demoEmployees, demoShifts } from "../src/server/seed.js";
 
+// The smoke test pokes at raw HTTP responses; typing every payload here
+// would duplicate the API types without adding safety.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = any;
+
 function check(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(`SMOKE FAIL: ${msg}`);
   console.log(`  ok  ${msg}`);
@@ -34,7 +39,8 @@ const req = async (method: string, path: string, actor?: string, body?: unknown)
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return { status: res.status, body: res.headers.get("content-type")?.includes("json") ? await res.json() : await res.text() };
+  const isJson = res.headers.get("content-type")?.includes("json");
+  return { status: res.status, body: (isJson ? await res.json() : await res.text()) as Json };
 };
 
 try {
