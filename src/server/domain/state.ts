@@ -2,6 +2,13 @@ import { isDynamicallyLegal, laborCost, staticViolations } from "./rules.js";
 import { duration } from "./time.js";
 import type { Assignment, Employee, LaborRules, Shift } from "./types.js";
 
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotFoundError";
+  }
+}
+
 /**
  * Mutable working copy of a week's schedule with O(1) lookups for the
  * things the solver and optimizer ask about constantly: who is on a shift,
@@ -42,13 +49,13 @@ export class ScheduleState {
 
   employee(id: string): Employee {
     const e = this.employeeById.get(id);
-    if (!e) throw new Error(`Unknown employee ${id}`);
+    if (!e) throw new NotFoundError(`Unknown employee ${id}`);
     return e;
   }
 
   shift(id: string): Shift {
     const s = this.shiftById.get(id);
-    if (!s) throw new Error(`Unknown shift ${id}`);
+    if (!s) throw new NotFoundError(`Unknown shift ${id}`);
     return s;
   }
 

@@ -199,3 +199,9 @@ export function cancelSwap(ctx: WorkflowContext, actor: Actor, swap: SwapRequest
   requireStatus(swap, ACTIVE_STATUSES);
   return transition(ctx, swap, actor, "cancel", { status: "cancelled" });
 }
+
+/** System-initiated close, e.g. when the manager regenerates the week. */
+export function expireSwap(ctx: WorkflowContext, swap: SwapRequest, actorId: string, reason: string): SwapRequest {
+  requireStatus(swap, ACTIVE_STATUSES);
+  return transition(ctx, swap, { kind: "manager", id: actorId }, "cancel", { status: "cancelled" }, reason);
+}
