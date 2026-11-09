@@ -118,6 +118,50 @@ export function dynamicViolations(
   return out;
 }
 
+function longestBitRun(mask: number): number {
+  let best = 0;
+  let run = 0;
+  for (let m = mask; m > 0; m >>>= 1) {
+    run = m & 1 ? run + 1 : 0;
+    if (run > best) best = run;
+  }
+  return best;
+}
+
+/**
+ * Allocation-free equivalent of `dynamicViolations(...).length === 0`.
+ * The solver calls this hundreds of thousands of times, so it skips
+ * building messages and bails out on the first broken rule. A property
+ * test keeps the two implementations in agreement.
+ */
+export function isDynamicallyLegal(
+  employee: Employee,
+  shift: Shift,
+  existing: readonly Shift[],
+  rules: LaborRules,
+): boolean {
+  const len = shift.end - shift.start;
+  const day = dayOf(shift.start);
+  let weekly = len;
+  let sameDay = len;
+  let mask = 1 << day;
+  for (let i = 0; i < existing.length; i++) {
+    const other = existing[i]!;
+    if (other.start < shift.end && shift.start < other.end) return false;
+    const gap = other.end <= shift.start ? shift.start - other.end : other.start - shift.end;
+    if (gap < rules.minRestMinutes) return false;
+    weekly += other.end - other.start;
+    const d = dayOf(other.start);
+    if (d === day) sameDay += other.end - other.start;
+    mask |= 1 << d;
+  }
+  if (weekly > employee.maxWeeklyMinutes) return false;
+  if (employee.isMinor && (sameDay > rules.minorMaxDailyMinutes || weekly > rules.minorMaxWeeklyMinutes)) {
+    return false;
+  }
+  return longestBitRun(mask) <= rules.maxConsecutiveDays;
+}
+
 export function checkAssignment(
   employee: Employee,
   shift: Shift,

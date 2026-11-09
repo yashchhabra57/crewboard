@@ -1,4 +1,4 @@
-import { dynamicViolations, laborCost, staticViolations } from "./rules.js";
+import { isDynamicallyLegal, laborCost, staticViolations } from "./rules.js";
 import { duration } from "./time.js";
 import type { Assignment, Employee, LaborRules, Shift } from "./types.js";
 
@@ -76,10 +76,7 @@ export class ScheduleState {
   canTake(employeeId: string, shiftId: string): boolean {
     if (!this.staticallyEligible(shiftId).has(employeeId)) return false;
     if (this.crewOf(shiftId).includes(employeeId)) return false;
-    return (
-      dynamicViolations(this.employee(employeeId), this.shift(shiftId), this.shiftsOf(employeeId), this.rules)
-        .length === 0
-    );
+    return isDynamicallyLegal(this.employee(employeeId), this.shift(shiftId), this.shiftsOf(employeeId), this.rules);
   }
 
   assign(employeeId: string, shiftId: string): void {

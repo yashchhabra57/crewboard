@@ -60,8 +60,31 @@ export function solve(
   let best: Assignment[] | null = null;
   let bestUnfilled = Number.POSITIVE_INFINITY;
 
-  const candidatesFor = (seat: Seat): string[] =>
-    [...state.staticallyEligible(seat.shiftId)].filter((id) => state.canTake(id, seat.shiftId));
+  // Forward checking: each open seat keeps the set of employees who could
+  // still legally take it. Assigning employee X can only change X's own
+  // legality elsewhere, so after an assignment we re-check X alone on the
+  // seats that still list them, and record removals on a trail for undo.
+  const domains: Set<string>[] = seats.map((seat) => new Set(state.staticallyEligible(seat.shiftId)));
+  domains.forEach((d, i) => {
+    for (const id of [...d]) if (!state.canTake(id, seats[i]!.shiftId)) d.delete(id);
+  });
+
+  const prune = (employeeId: string): number[] => {
+    const removed: number[] = [];
+    for (let i = 0; i < seats.length; i++) {
+      if (decided[i] || !domains[i]!.has(employeeId)) continue;
+      if (!state.canTake(employeeId, seats[i]!.shiftId)) {
+        domains[i]!.delete(employeeId);
+        removed.push(i);
+      }
+    }
+    return removed;
+  };
+  const restore = (employeeId: string, removed: number[]) => {
+    for (const i of removed) domains[i]!.add(employeeId);
+  };
+
+  const candidatesFor = (i: number): string[] => [...domains[i]!];
 
   const order = (ids: string[]): string[] =>
     ids.sort((a, b) => {
@@ -88,24 +111,27 @@ export function solve(
 
     // Pick the most constrained open seat and compute the lower bound in one pass.
     let pick = -1;
-    let pickCandidates: string[] = [];
+    let pickSize = Number.POSITIVE_INFINITY;
     let forcedEmpty = 0;
     for (let i = 0; i < seats.length; i++) {
       if (decided[i]) continue;
-      const c = candidatesFor(seats[i]!);
-      if (c.length === 0) forcedEmpty++;
-      if (pick < 0 || c.length < pickCandidates.length) {
+      const size = domains[i]!.size;
+      if (size === 0) forcedEmpty++;
+      if (size < pickSize) {
         pick = i;
-        pickCandidates = c;
+        pickSize = size;
       }
     }
     if (unfilledSoFar + forcedEmpty >= bestUnfilled) return;
 
     const seat = seats[pick]!;
+    const pickCandidates = candidatesFor(pick);
     decided[pick] = true;
     for (const id of order(pickCandidates)) {
       state.assign(id, seat.shiftId);
+      const removed = prune(id);
       dfs(remaining - 1);
+      restore(id, removed);
       state.unassign(id, seat.shiftId);
       if (aborted || bestUnfilled === 0) break;
     }

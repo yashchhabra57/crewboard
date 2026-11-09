@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { checkAssignment, dynamicViolations, laborCost, staticViolations } from "../src/server/domain/rules.js";
+import {
+  checkAssignment,
+  dynamicViolations,
+  isDynamicallyLegal,
+  laborCost,
+  staticViolations,
+} from "../src/server/domain/rules.js";
 import { longestDayRun, weekMinute } from "../src/server/domain/time.js";
 import { DEFAULT_RULES } from "../src/server/domain/types.js";
 import { codes, emp, shift } from "./helpers.js";
@@ -68,6 +74,28 @@ describe("dynamicViolations", () => {
     );
     const week = [shift(0, 16, 21), shift(1, 16, 21), shift(2, 16, 21)];
     expect(codes(dynamicViolations(minor, shift(3, 16, 21), week, DEFAULT_RULES))).toEqual(["MINOR_WEEKLY"]);
+  });
+});
+
+describe("isDynamicallyLegal", () => {
+  it("agrees with dynamicViolations on 2000 random cases", () => {
+    let seed = 7;
+    const rand = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2 ** 31;
+      return seed % n;
+    };
+    for (let i = 0; i < 2000; i++) {
+      const e = emp({ isMinor: rand(3) === 0, maxWeeklyMinutes: (8 + rand(40)) * 60 });
+      const mk = () => {
+        const start = rand(7) * 1440 + rand(20) * 60;
+        return { id: `x${i}`, role: "server" as const, start, end: start + (2 + rand(9)) * 60, headcount: 1 };
+      };
+      const existing = Array.from({ length: rand(7) }, mk);
+      const s = mk();
+      expect(isDynamicallyLegal(e, s, existing, DEFAULT_RULES)).toBe(
+        dynamicViolations(e, s, existing, DEFAULT_RULES).length === 0,
+      );
+    }
   });
 });
 
